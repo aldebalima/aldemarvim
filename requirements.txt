@@ -1,0 +1,21 @@
+# Interface Gráfica (já incluso no Python)
+# tkinter
+
+# Banco de dados NoSQL local
+tinydb>=4.8.0
+
+# OCR - Extração de texto de imagem
+pytesseract>=0.3.10
+Pillow>=11.0.0
+
+# Tradução EN -> PT
+deep-translator>=1.11.4
+
+# Geração de PDF
+fpdf2>=2.7.9
+
+# Build para .exe (Windows)
+pyinstaller>=6.15.0
+
+# Utilitários
+pyperclip>=1.9.0
