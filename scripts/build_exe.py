@@ -103,7 +103,6 @@ def build():
     icon_path = os.path.join(ROOT_DIR, "assets", "Aldemarvim.ico")
     if not os.path.exists(icon_path):
         print("\n  AVISO - Aldemarvim.ico nao encontrado. Gerando...")
-        import subprocess
         subprocess.run([sys.executable, os.path.join(ROOT_DIR, "scripts", "create_icon.py")])
 
     # 3. Build com PyInstaller
