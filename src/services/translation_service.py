@@ -68,6 +68,51 @@ class TranslationService:
 
         return blocks
 
+    @staticmethod
+    def merge_texts(original: str, translated: str) -> str:
+        """
+        Mescla texto original (EN) e traduzido (PT) linha a linha.
+        Para cada frase/linha traduzida, exibe a versão PT seguida da EN.
+
+        Exemplo:
+            Meu nome é Aldemarvim
+            My name is Aldemarvim
+
+            Eu gosto de programar
+            I like to program
+
+        Args:
+            original: Texto original em inglês.
+            translated: Texto traduzido em português.
+
+        Returns:
+            Texto mesclado PT/EN.
+        """
+        if not original and not translated:
+            return ""
+
+        original_lines = [l.strip() for l in original.strip().splitlines()]
+        translated_lines = [l.strip() for l in translated.strip().splitlines()]
+
+        # Remove linhas vazias consecutivas para alinhamento melhor
+        original_lines = [l for l in original_lines if l]
+        translated_lines = [l for l in translated_lines if l]
+
+        max_len = max(len(original_lines), len(translated_lines))
+        merged = []
+
+        for i in range(max_len):
+            pt_line = translated_lines[i] if i < len(translated_lines) else ""
+            en_line = original_lines[i] if i < len(original_lines) else ""
+
+            if pt_line:
+                merged.append(pt_line)
+            if en_line:
+                merged.append(en_line)
+            merged.append("")  # Linha em branco separadora
+
+        return "\n".join(merged).strip()
+
     def _sanitize_for_pdf(self, text: str) -> str:
         """
         Remove caracteres que podem atrapalhar a geração do PDF.

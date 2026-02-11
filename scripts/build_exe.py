@@ -81,7 +81,7 @@ def build():
     print("=" * 60)
 
     # 1. Verifica Tesseract
-    print("\n→ Procurando Tesseract OCR instalado...")
+    print("\n-> Procurando Tesseract OCR instalado...")
     tesseract_path = find_tesseract()
 
     add_data_args = [
@@ -89,26 +89,34 @@ def build():
     ]
 
     if tesseract_path:
-        print(f"  ✅ Encontrado em: {tesseract_path}")
-        print("  → Preparando bundle do Tesseract...")
+        print(f"  OK - Encontrado em: {tesseract_path}")
+        print("  -> Preparando bundle do Tesseract...")
         bundle_dir = prepare_tesseract_bundle(tesseract_path)
         add_data_args.append(f"--add-data={bundle_dir};tesseract")
-        print(f"  ✅ Bundle criado em: {bundle_dir}")
+        print(f"  OK - Bundle criado em: {bundle_dir}")
     else:
-        print("  ⚠️  Tesseract NÃO encontrado no sistema!")
+        print("  AVISO - Tesseract NAO encontrado no sistema!")
         print("     O .exe será gerado, mas o usuário precisará instalar o Tesseract.")
         print("     Instale de: https://github.com/tesseract-ocr/tesseract/releases")
 
-    # 2. Build com PyInstaller
-    print("\n→ Gerando executável com PyInstaller...")
+    # 2. Verifica ícone
+    icon_path = os.path.join(ROOT_DIR, "assets", "Aldemarvim.ico")
+    if not os.path.exists(icon_path):
+        print("\n  AVISO - Aldemarvim.ico nao encontrado. Gerando...")
+        import subprocess
+        subprocess.run([sys.executable, os.path.join(ROOT_DIR, "scripts", "create_icon.py")])
+
+    # 3. Build com PyInstaller
+    print("\n-> Gerando executavel com PyInstaller...")
     cmd = [
         sys.executable,
         "-m",
         "PyInstaller",
         "--name=Aldemarvin",
-        "--onedir",   # onedir para manter Tesseract acessível
+        "--onedir",   # onedir para manter Tesseract acessível e evitar problemas com DLLs
         "--windowed",
-        "--clean",
+        "--noupx",    # Desabilita UPX (evita falsos positivos em antivírus)
+        f"--icon={icon_path}",
         f"--distpath={os.path.join(ROOT_DIR, 'dist')}",
         f"--workpath={os.path.join(ROOT_DIR, 'build')}",
         f"--specpath={os.path.join(ROOT_DIR, 'build')}",
@@ -117,8 +125,11 @@ def build():
         "--hidden-import=tinydb",
         "--hidden-import=pytesseract",
         "--hidden-import=PIL",
+        "--hidden-import=PIL._tkinter_finder",
         "--hidden-import=deep_translator",
         "--hidden-import=fpdf",
+        # Coleta todas as DLLs do tkinter (resolve python314.dll)
+        "--collect-all=tkinter",
         # Ponto de entrada
         os.path.join(ROOT_DIR, "run.py"),
     ]
@@ -129,16 +140,16 @@ def build():
     if result.returncode == 0:
         dist_dir = os.path.join(ROOT_DIR, "dist", "Aldemarvin")
         print("\n" + "=" * 60)
-        print("  ✅ Build concluído com sucesso!")
-        print(f"  Pasta do executável: {dist_dir}")
-        print(f"  Executável: {os.path.join(dist_dir, 'Aldemarvin.exe')}")
+        print("  OK - Build concluido com sucesso!")
+        print(f"  Pasta do executavel: {dist_dir}")
+        print(f"  Executavel: {os.path.join(dist_dir, 'Aldemarvin.exe')}")
         if tesseract_path:
-            print("  📦 Tesseract OCR embutido: SIM")
+            print("  Tesseract OCR embutido: SIM")
         else:
-            print("  ⚠️  Tesseract OCR embutido: NÃO (precisa instalar separadamente)")
+            print("  AVISO - Tesseract OCR embutido: NAO (precisa instalar separadamente)")
         print("=" * 60)
     else:
-        print("\n  ❌ Erro no build.")
+        print("\n  ERRO - Falha no build.")
         sys.exit(1)
 
     # Limpeza do bundle temporário

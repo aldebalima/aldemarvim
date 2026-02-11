@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from src.config import COLORS, FONTS
+from src.services.translation_service import TranslationService
 from src.ui.base import StyledButton, StyledFrame, StyledLabel, StyledText
 
 
@@ -123,7 +124,7 @@ class TextEditorScreen(tk.Frame):
 
         # Texto original (somente leitura)
         left_frame = StyledFrame(edit_container)
-        left_frame.pack(side="left", expand=True, fill="both", padx=(0, 10))
+        left_frame.pack(side="left", expand=True, fill="both", padx=(0, 5))
 
         StyledLabel(
             left_frame, text="Texto Original", style="body_bold"
@@ -134,15 +135,27 @@ class TextEditorScreen(tk.Frame):
         self.original_text.config(state="disabled")
 
         # Texto traduzido (editável)
-        right_frame = StyledFrame(edit_container)
-        right_frame.pack(side="left", expand=True, fill="both")
+        mid_frame = StyledFrame(edit_container)
+        mid_frame.pack(side="left", expand=True, fill="both", padx=(5, 5))
 
         StyledLabel(
-            right_frame, text="Texto Traduzido (Editável)", style="body_bold"
+            mid_frame, text="Texto Traduzido (Editavel)", style="body_bold"
         ).pack(anchor="w", pady=(0, 5))
 
-        self.translated_text = StyledText(right_frame)
+        self.translated_text = StyledText(mid_frame)
         self.translated_text.pack(expand=True, fill="both")
+
+        # Texto mesclado PT/EN (somente leitura)
+        right_frame = StyledFrame(edit_container)
+        right_frame.pack(side="left", expand=True, fill="both", padx=(5, 0))
+
+        StyledLabel(
+            right_frame, text="Mesclado (PT / EN)", style="body_bold"
+        ).pack(anchor="w", pady=(0, 5))
+
+        self.merged_text = StyledText(right_frame)
+        self.merged_text.pack(expand=True, fill="both")
+        self.merged_text.config(state="disabled")
 
         # ── Rodapé ─────────────────────────────────────────────────────────
         footer = StyledFrame(self)
@@ -150,26 +163,36 @@ class TextEditorScreen(tk.Frame):
 
         StyledButton(
             footer,
-            text="💾 Salvar Alterações",
+            text="Salvar Pagina",
             command=self._save_current_page,
             style="success",
         ).pack(side="left", padx=(0, 10))
 
         StyledButton(
             footer,
-            text="💾 Salvar Tudo",
+            text="Salvar Tudo",
             command=self._save_all,
             style="primary",
+        ).pack(side="left", padx=(0, 10))
+
+        StyledButton(
+            footer,
+            text="Atualizar Mesclado",
+            command=lambda: self._update_merged_text(),
+            style="secondary",
         ).pack(side="left")
 
     def _display_current_page(self):
         """Exibe a página atual nos campos de texto."""
         if not self.pages:
-            self.page_info_label.config(text="Nenhuma página")
+            self.page_info_label.config(text="Nenhuma pagina")
             self.original_text.config(state="normal")
             self.original_text.delete("1.0", tk.END)
             self.original_text.config(state="disabled")
             self.translated_text.delete("1.0", tk.END)
+            self.merged_text.config(state="normal")
+            self.merged_text.delete("1.0", tk.END)
+            self.merged_text.config(state="disabled")
             self._update_nav_buttons()
             return
 
@@ -177,20 +200,42 @@ class TextEditorScreen(tk.Frame):
         total = len(self.pages)
 
         self.page_info_label.config(
-            text=f"Página {self.current_page_index + 1} / {total}"
+            text=f"Pagina {self.current_page_index + 1} / {total}"
         )
+
+        original = page.get("original_text", "")
+        translated = page.get("translated_text", "")
 
         # Original (somente leitura)
         self.original_text.config(state="normal")
         self.original_text.delete("1.0", tk.END)
-        self.original_text.insert("1.0", page.get("original_text", ""))
+        self.original_text.insert("1.0", original)
         self.original_text.config(state="disabled")
 
         # Traduzido (editável)
         self.translated_text.delete("1.0", tk.END)
-        self.translated_text.insert("1.0", page.get("translated_text", ""))
+        self.translated_text.insert("1.0", translated)
+
+        # Mesclado (somente leitura)
+        self._update_merged_text(original, translated)
 
         self._update_nav_buttons()
+
+    def _update_merged_text(self, original: str = None, translated: str = None):
+        """Atualiza a caixa de texto mesclado PT/EN (somente leitura)."""
+        if original is None:
+            self.original_text.config(state="normal")
+            original = self.original_text.get("1.0", tk.END).strip()
+            self.original_text.config(state="disabled")
+        if translated is None:
+            translated = self.translated_text.get("1.0", tk.END).strip()
+
+        merged = TranslationService.merge_texts(original, translated)
+
+        self.merged_text.config(state="normal")
+        self.merged_text.delete("1.0", tk.END)
+        self.merged_text.insert("1.0", merged)
+        self.merged_text.config(state="disabled")
 
     def _update_nav_buttons(self):
         """Atualiza estado dos botões de navegação."""
@@ -204,7 +249,7 @@ class TextEditorScreen(tk.Frame):
         )
 
     def _save_current_page(self):
-        """Salva as alterações da página atual."""
+        """Salva as alteracoes da pagina atual."""
         if not self.pages:
             return
 
@@ -212,7 +257,11 @@ class TextEditorScreen(tk.Frame):
         translated = self.translated_text.get("1.0", tk.END).strip()
         self.db.update_page(page["id"], translated_text=translated)
         self.pages[self.current_page_index]["translated_text"] = translated
-        messagebox.showinfo("Sucesso", "Página salva com sucesso!")
+
+        # Atualiza texto mesclado com o conteudo editado
+        self._update_merged_text(translated=translated)
+
+        messagebox.showinfo("Sucesso", "Pagina salva com sucesso!")
 
     def _save_all(self):
         """Salva todas as páginas."""

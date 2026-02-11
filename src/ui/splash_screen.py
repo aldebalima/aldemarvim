@@ -4,10 +4,10 @@ Mostra logo rotacionando, texto ALDEMARVIM e barra de loading por 3 segundos.
 """
 
 import tkinter as tk
-from PIL import ImageTk
+import os
+from PIL import Image, ImageTk
 
-from src.config import COLORS, FONTS, SPLASH_DURATION_MS
-from src.utils.logo_generator import LogoGenerator
+from src.config import COLORS, FONTS, SPLASH_DURATION_MS, ASSETS_DIR
 
 
 class SplashScreen(tk.Toplevel):
@@ -33,10 +33,10 @@ class SplashScreen(tk.Toplevel):
         self.attributes("-topmost", True)
         self.focus_force()
 
-        # ── Gera a logo ───────────────────────────────────────────────────
-        self.logo_size = 180
-        self.logo_generator = LogoGenerator()
-        self.original_logo = self.logo_generator.create_logo(self.logo_size)
+        # ── Carrega a logo ────────────────────────────────────────────────
+        self.logo_size = 200
+        logo_path = os.path.join(ASSETS_DIR, "Aldemarvim.png")
+        self.original_logo = Image.open(logo_path).resize((self.logo_size, self.logo_size), Image.LANCZOS)
         self.rotation_angle = 0
         self.logo_photo = None
 
@@ -119,7 +119,7 @@ class SplashScreen(tk.Toplevel):
 
     def _update_logo_image(self):
         """Atualiza a imagem da logo com a rotação atual."""
-        rotated = LogoGenerator.rotate_image(self.original_logo, self.rotation_angle)
+        rotated = self.original_logo.rotate(self.rotation_angle, resample=Image.BICUBIC, expand=False)
         self.logo_photo = ImageTk.PhotoImage(rotated)
         self.logo_label.config(image=self.logo_photo)
 

@@ -122,13 +122,13 @@ class ImageCaptureScreen(tk.Frame):
             style="heading",
         ).pack(anchor="w", pady=(0, 10))
 
-        # Container com duas colunas
+        # Container com colunas
         columns = StyledFrame(text_section)
         columns.pack(expand=True, fill="both")
 
         # Coluna esquerda - Texto original
         left_col = StyledFrame(columns)
-        left_col.pack(side="left", expand=True, fill="both", padx=(0, 5))
+        left_col.pack(side="left", expand=True, fill="both", padx=(0, 3))
 
         StyledLabel(left_col, text="Texto Original (EN)", style="body_bold").pack(
             anchor="w", pady=(0, 5)
@@ -138,28 +138,39 @@ class ImageCaptureScreen(tk.Frame):
 
         # Coluna central - Botão traduzir
         center_col = StyledFrame(columns)
-        center_col.pack(side="left", fill="y", padx=8)
+        center_col.pack(side="left", fill="y", padx=6)
 
         # Spacer para centralizar o botão
         tk.Frame(center_col, bg=COLORS["bg_primary"], height=60).pack()
 
         self.translate_btn = StyledButton(
             center_col,
-            text="Traduzir\n  EN → PT  ",
+            text="Traduzir\n EN > PT ",
             command=self._translate_text,
             style="primary",
         )
         self.translate_btn.pack(pady=10)
 
-        # Coluna direita - Texto traduzido
-        right_col = StyledFrame(columns)
-        right_col.pack(side="left", expand=True, fill="both", padx=(5, 0))
+        # Coluna centro-direita - Texto traduzido
+        mid_col = StyledFrame(columns)
+        mid_col.pack(side="left", expand=True, fill="both", padx=(3, 3))
 
         StyledLabel(
-            right_col, text="Texto Traduzido (PT) — Editável", style="body_bold"
+            mid_col, text="Texto Traduzido (PT) - Editavel", style="body_bold"
         ).pack(anchor="w", pady=(0, 5))
-        self.translated_text = StyledText(right_col)
+        self.translated_text = StyledText(mid_col)
         self.translated_text.pack(expand=True, fill="both")
+
+        # Coluna direita - Texto mesclado (somente leitura)
+        right_col = StyledFrame(columns)
+        right_col.pack(side="left", expand=True, fill="both", padx=(3, 0))
+
+        StyledLabel(
+            right_col, text="Mesclado (PT / EN)", style="body_bold"
+        ).pack(anchor="w", pady=(0, 5))
+        self.merged_text = StyledText(right_col)
+        self.merged_text.pack(expand=True, fill="both")
+        self.merged_text.config(state="disabled")
 
         # ── Botões de ação (rodapé) ────────────────────────────────────────
         footer = StyledFrame(container)
@@ -263,14 +274,14 @@ class ImageCaptureScreen(tk.Frame):
             messagebox.showerror("Erro OCR", f"Erro na extração: {str(e)}")
 
     def _translate_text(self):
-        """Traduz o texto original para português."""
+        """Traduz o texto original para portugues e gera texto mesclado."""
         text = self.original_text.get("1.0", tk.END).strip()
         if not text:
             messagebox.showwarning("Aviso", "Extraia o texto primeiro.")
             return
 
         try:
-            self.translate_btn.config(text="⏳ Traduzindo...", state="disabled")
+            self.translate_btn.config(text="Traduzindo...", state="disabled")
             self.update_idletasks()
 
             translated = self.translator.translate(text)
@@ -278,11 +289,28 @@ class ImageCaptureScreen(tk.Frame):
             self.translated_text.delete("1.0", tk.END)
             self.translated_text.insert("1.0", translated)
 
-            self.translate_btn.config(text="Traduzir\n  EN → PT  ", state="normal")
+            # Gera texto mesclado PT/EN
+            self._update_merged_text(text, translated)
+
+            self.translate_btn.config(text="Traduzir\n EN > PT ", state="normal")
 
         except Exception as e:
-            self.translate_btn.config(text="Traduzir\n  EN → PT  ", state="normal")
-            messagebox.showerror("Erro", f"Erro na tradução: {str(e)}")
+            self.translate_btn.config(text="Traduzir\n EN > PT ", state="normal")
+            messagebox.showerror("Erro", f"Erro na traducao: {str(e)}")
+
+    def _update_merged_text(self, original: str = None, translated: str = None):
+        """Atualiza a caixa de texto mesclado PT/EN (somente leitura)."""
+        if original is None:
+            original = self.original_text.get("1.0", tk.END).strip()
+        if translated is None:
+            translated = self.translated_text.get("1.0", tk.END).strip()
+
+        merged = TranslationService.merge_texts(original, translated)
+
+        self.merged_text.config(state="normal")
+        self.merged_text.delete("1.0", tk.END)
+        self.merged_text.insert("1.0", merged)
+        self.merged_text.config(state="disabled")
 
     def _get_page_data(self) -> dict | None:
         """Coleta os dados da página atual."""
@@ -326,6 +354,9 @@ class ImageCaptureScreen(tk.Frame):
         )
         self.original_text.delete("1.0", tk.END)
         self.translated_text.delete("1.0", tk.END)
+        self.merged_text.config(state="normal")
+        self.merged_text.delete("1.0", tk.END)
+        self.merged_text.config(state="disabled")
         self.extract_btn.config(state="disabled")
 
     def _save_and_finish(self):
