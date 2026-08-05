@@ -9,7 +9,7 @@ from tkinter import messagebox
 from datetime import datetime
 
 from src.config import COLORS, FONTS
-from src.services.pdf_service import PDFService
+from src.services.pdf_service import PDFService, PDFTextEncodingError
 from src.ui.base import (
     StyledButton,
     StyledFrame,
@@ -253,6 +253,8 @@ class MainScreen(tk.Frame):
             filename = f"{extraction['name']}_{extraction.get('version', '')}_{extraction.get('doc_type', '')}"
             pdf_path = self.pdf_service.generate_pdf(title, pages, filename)
             self.pdf_service.open_pdf(pdf_path)
+        except PDFTextEncodingError as e:
+            messagebox.showerror("Erro ao gerar PDF", e.format_message())
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao gerar PDF: {str(e)}")
 

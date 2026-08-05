@@ -6,10 +6,95 @@ Utiliza fpdf2.
 import os
 import platform
 import subprocess
+from dataclasses import dataclass
 
 from fpdf import FPDF
 
 from src.config import EXPORTS_DIR
+
+# Helvetica (fonte core do fpdf2) só aceita Latin-1.
+_LATIN1 = "latin-1"
+_CONTEXT_RADIUS = 20
+
+
+@dataclass(frozen=True)
+class EncodingIssue:
+    """Um caractere incompatível encontrado em título ou página."""
+
+    location: str  # ex.: "capa/título" ou "Página 3"
+    char: str
+    position: int
+    context: str
+
+    @property
+    def codepoint(self) -> str:
+        return f"U+{ord(self.char):04X}"
+
+
+class PDFTextEncodingError(Exception):
+    """Texto contém caracteres incompatíveis com Helvetica/Latin-1."""
+
+    def __init__(self, issues: list[EncodingIssue]):
+        self.issues = issues
+        super().__init__(self.format_message())
+
+    def format_message(self) -> str:
+        lines = [
+            "Não foi possível gerar o PDF: caracteres incompatíveis "
+            "com a fonte Helvetica.",
+            "",
+        ]
+        for issue in self.issues:
+            char_display = issue.char if issue.char.isprintable() else "?"
+            lines.append(
+                f'{issue.location}: caractere "{char_display}" '
+                f"({issue.codepoint}) perto de: \"...{issue.context}...\""
+            )
+        lines.append("")
+        lines.append(
+            "Abra Editar, vá até essas páginas e substitua os caracteres especiais."
+        )
+        return "\n".join(lines)
+
+
+def _context_snippet(text: str, index: int, radius: int = _CONTEXT_RADIUS) -> str:
+    start = max(0, index - radius)
+    end = min(len(text), index + radius + 1)
+    snippet = text[start:end].replace("\n", " ").replace("\r", " ")
+    return snippet
+
+
+def _find_latin1_issues(text: str, location: str) -> list[EncodingIssue]:
+    """Retorna todos os caracteres fora de Latin-1 em um texto."""
+    if not text:
+        return []
+
+    issues: list[EncodingIssue] = []
+    for i, ch in enumerate(text):
+        try:
+            ch.encode(_LATIN1)
+        except UnicodeEncodeError:
+            issues.append(
+                EncodingIssue(
+                    location=location,
+                    char=ch,
+                    position=i,
+                    context=_context_snippet(text, i),
+                )
+            )
+    return issues
+
+
+def _collect_encoding_issues(title: str, pages: list[dict]) -> list[EncodingIssue]:
+    """Valida título e textos das páginas contra Latin-1."""
+    issues = _find_latin1_issues(title or "", "Capa/título")
+
+    for page in pages:
+        page_num = page.get("page_number", "?")
+        text = page.get("translated_text") or page.get("original_text", "")
+        issues.extend(_find_latin1_issues(text, f"Página {page_num}"))
+
+    return issues
 
 
 class PDFService:
@@ -35,7 +120,15 @@ class PDFService:
 
         Returns:
             Caminho completo do PDF gerado.
+
+        Raises:
+            PDFTextEncodingError: Se título ou páginas tiverem caracteres
+                incompatíveis com Helvetica/Latin-1.
         """
+        issues = _collect_encoding_issues(title, pages)
+        if issues:
+            raise PDFTextEncodingError(issues)
+
         if output_filename is None:
             safe_title = "".join(
                 c if c.isalnum() or c in (" ", "-", "_") else "_" for c in title
